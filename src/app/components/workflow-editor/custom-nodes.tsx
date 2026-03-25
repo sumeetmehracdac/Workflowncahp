@@ -24,29 +24,29 @@ export const SwimlaneNode = memo(({ data }: NodeProps<SwimlaneNodeData>) => {
       <div
         className="flex flex-col items-center justify-center gap-1 shrink-0"
         style={{
-          width: 82,
+          width: 110, // Increased from 82 to fit larger labels
           background: `linear-gradient(180deg, ${conf.color} 0%, ${conf.darkColor} 100%)`,
-          padding: '12px 8px',
+          padding: '12px 10px',
         }}
       >
         <div
           className="flex items-center justify-center rounded-lg"
           style={{
-            width: 34, height: 34,
+            width: 38, height: 38, // Slightly larger circle
             backgroundColor: 'rgba(255,255,255,0.18)',
-            border: '1.5px solid rgba(255,255,255,0.28)',
+            border: '2px solid rgba(255,255,255,0.28)',
           }}
         >
-          <span style={{ fontSize: 16, fontWeight: 900, color: 'white', lineHeight: 1 }}>
+          <span style={{ fontSize: 19, fontWeight: 900, color: 'white', lineHeight: 1 }}>
             {conf.step}
           </span>
         </div>
         <p className="text-white text-center leading-tight mt-1.5"
-          style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.02em' }}>
+          style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.02em' }}>
           {conf.label}
         </p>
         <p className="text-center"
-          style={{ fontSize: 7.5, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+          style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>
           {conf.sublabel}
         </p>
       </div>
@@ -54,8 +54,8 @@ export const SwimlaneNode = memo(({ data }: NodeProps<SwimlaneNodeData>) => {
       <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: conf.lightBg }}>
         <p className="select-none pointer-events-none"
           style={{
-            fontSize: 10, color: conf.color, opacity: 0.28,
-            letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700,
+            fontSize: 12, color: conf.color, opacity: 0.35,
+            letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 700,
           }}>
           · · · drag roles here · · ·
         </p>

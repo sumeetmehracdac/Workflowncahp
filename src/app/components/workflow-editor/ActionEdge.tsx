@@ -4,6 +4,7 @@ import {
   EdgeLabelRenderer,
   BaseEdge,
   useReactFlow,
+  MarkerType,
   type EdgeProps,
   type Edge,
 } from 'reactflow';
@@ -12,9 +13,8 @@ import {
   XCircle,
   CornerDownLeft,
   ArrowLeft,
-  ArrowRight,
   TrendingUp,
-  ChevronDown,
+  ArrowRight,
 } from 'lucide-react';
 import type { ActionType, ActionEdgeData, RoleNodeData } from './types';
 import { useWorkflowContext } from './WorkflowContext';
@@ -110,22 +110,44 @@ export function ActionEdge({
   let strokeWidth = 2;
   let edgeOpacity = 1;
 
+  const isDirectlySelected = isSelected || selectedEdgeId === id;
+  const highlightLine = (isConnectedToSelected && selectedNodeId !== null) || isDirectlySelected;
+
   if (isPreviewMode) {
     strokeColor = isPreviewActive ? '#f27e00' : isPreviewPast ? '#10b981' : '#9ca3af';
     strokeWidth = isPreviewActive ? 3.5 : 2;
     edgeOpacity = isPreviewFuture ? 0.25 : isPreviewPast ? 0.75 : 1;
   } else {
-    // INCREASED BASE OPACITY: Boosted from 0.35 to 0.6 to resolve user feedback about faintness
-    edgeOpacity = !isFocused ? 0.6 : isSelected ? 1 : isHovered ? 0.9 : 0.75;
-    // INCREASED ACTIVE STROKE: Active paths now thicken more aggressively.
-    strokeWidth = isSelected ? 3.5 : isHovered ? 3 : 2;
+    // User requested NO dimming on unselected elements. They must remain fully visible.
+    edgeOpacity = isHovered || highlightLine ? 1 : 0.9;
+    
+    // HIGHLIGHT: Distinct Teal color + thicker line for selected paths
+    strokeColor = highlightLine ? '#008484' : '#f27e00';
+    // By keeping strokeWidth at 3 max, the SVG marker won't explode in scaling
+    strokeWidth = highlightLine ? 3 : isHovered ? 2.5 : 2;
   }
+
+  const markerId = `custom-arrow-${id}-${highlightLine ? 'active' : 'inactive'}`;
 
   return (
     <>
+      <defs>
+        <marker
+          id={markerId}
+          viewBox="0 0 16 16"
+          refX="15"
+          refY="8"
+          markerWidth={highlightLine ? 11 : 7}
+          markerHeight={highlightLine ? 11 : 7}
+          orient="auto"
+        >
+          <path d="M 0,0 L 16,8 L 0,16 z" fill={strokeColor} />
+        </marker>
+      </defs>
+
       <BaseEdge
         path={edgePath}
-        markerEnd={markerEnd}
+        markerEnd={`url(#${markerId})`}
         style={{
           stroke: strokeColor,
           strokeWidth,
@@ -172,7 +194,7 @@ export function ActionEdge({
               zIndex: isSelected ? 100 : 50,
               opacity: isPreviewMode
                 ? isPreviewActive ? 1 : isPreviewPast ? 0.6 : 0.15
-                : !isFocused ? 0.55 : 1,
+                : 1, // No dimming for unfocused state per user request
               transition: 'opacity 0.2s',
             }}
           className="nodrag nopan"
@@ -222,30 +244,35 @@ export function ActionEdge({
             style={{
               background: isPreviewPast
                 ? 'linear-gradient(135deg, #10b981, #059669)'
-                : 'linear-gradient(135deg, #f27e00, #d96c00)',
+                : highlightLine
+                  ? 'linear-gradient(135deg, #008484, #006868)' // Distinct Teal for Highlight
+                  : 'linear-gradient(135deg, #f27e00, #d96c00)', // Standard Orange
               border: isSelected || isPreviewActive ? '2px solid white' : '2px solid rgba(255,255,255,0.5)',
-              boxShadow: isSelected || isPreviewActive
-                ? '0 0 0 3px rgba(242,126,0,0.45), 0 4px 16px rgba(242,126,0,0.4)'
-                : '0 3px 12px rgba(242,126,0,0.35)',
-              padding: showFull ? '7px 14px 7px 10px' : '7px 10px',
-              gap: showFull ? 6 : 4,
-              transition: 'padding 0.15s, gap 0.15s, box-shadow 0.2s',
+              boxShadow: highlightLine
+                ? '0 0 0 3px rgba(0,132,132,0.35), 0 6px 20px rgba(0,132,132,0.45)'
+                : isPreviewActive 
+                  ? '0 0 0 3px rgba(242,126,0,0.45), 0 4px 16px rgba(242,126,0,0.4)'
+                  : '0 3px 12px rgba(242,126,0,0.35)',
+              padding: showFull ? '5px 11px 5px 8px' : '5px 8px',
+              gap: showFull ? 5 : 3,
+              transform: highlightLine ? 'scale(1.12)' : 'scale(1)',
+              transition: 'all 0.25s cubic-bezier(0.22, 1, 0.36, 1)',
             }}
           >
             <span className="rounded-full shrink-0" style={{
-              width: 8, height: 8,
+              width: 6, height: 6,
               backgroundColor: def.color,
               border: '1.5px solid rgba(255,255,255,0.6)',
               display: 'inline-block',
             }} />
-            <ActionIcon className="w-4 h-4 text-white shrink-0" />
+            <ActionIcon className="w-3.5 h-3.5 text-white shrink-0" />
               <div className="flex items-baseline gap-2">
                 {data?.actionId && (
-                   <span style={{ fontSize: 13, fontWeight: 900, color: 'rgba(255,255,255,0.9)', letterSpacing: '0.05em' }}>
+                   <span style={{ fontSize: 10.5, fontWeight: 900, color: 'rgba(255,255,255,0.9)', letterSpacing: '0.05em' }}>
                     {data?.actionId}
                    </span>
                 )}
-                <span className="text-white" style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
+                <span className="text-white" style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
                   {trunc(data?.actionLabel || def.label)}
                 </span>
               </div>
