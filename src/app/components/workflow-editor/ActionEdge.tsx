@@ -5,6 +5,7 @@ import {
   BaseEdge,
   useReactFlow,
   type EdgeProps,
+  type Edge,
 } from 'reactflow';
 import {
   CheckCircle2,
@@ -55,7 +56,7 @@ export function ActionEdge({
   sourcePosition, targetPosition,
   data, markerEnd, selected,
 }: EdgeProps<ActionEdgeData>) {
-  const { getNodes, setEdges } = useReactFlow();
+  const { getNodes, setEdges, getEdges } = useReactFlow();
   const { selectedNodeId, selectedEdgeId, isPreviewMode, previewActiveEdgeId, previewPastEdgeIds, openEdgeProperties } =
     useWorkflowContext();
 
@@ -91,6 +92,15 @@ export function ActionEdge({
     borderRadius: 14,
     offset: isBackward ? 60 : 24,
   });
+
+  // ── Sibling Edge Calculation for label offset ──────────────────────────
+  const allEdges = getEdges();
+  const siblings = allEdges.filter((e: Edge) => e.source === source && e.target === target);
+  siblings.sort((a: Edge, b: Edge) => a.id.localeCompare(b.id)); // Stable order
+  const siblingIndex = siblings.findIndex((e: Edge) => e.id === id);
+  const edgeCount = siblings.length;
+  // Space out exactly overlapping pills by 52px each
+  const yOffset = edgeCount > 1 ? (siblingIndex - (edgeCount - 1) / 2) * 52 : 0;
 
 
   // ── Visual state ────────────────────────────────────────────────────────
@@ -155,7 +165,7 @@ export function ActionEdge({
         <div
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY + yOffset}px)`,
               pointerEvents: isPreviewMode ? 'none' : 'all',
               zIndex: isSelected ? 100 : 50,
               opacity: isPreviewMode
