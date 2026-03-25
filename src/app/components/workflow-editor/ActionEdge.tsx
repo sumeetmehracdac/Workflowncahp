@@ -112,11 +112,13 @@ export function ActionEdge({
 
   if (isPreviewMode) {
     strokeColor = isPreviewActive ? '#f27e00' : isPreviewPast ? '#10b981' : '#9ca3af';
-    strokeWidth = isPreviewActive ? 3 : 2;
-    edgeOpacity = isPreviewFuture ? 0.2 : isPreviewPast ? 0.75 : 1;
+    strokeWidth = isPreviewActive ? 3.5 : 2;
+    edgeOpacity = isPreviewFuture ? 0.25 : isPreviewPast ? 0.75 : 1;
   } else {
-    edgeOpacity = !isFocused ? 0.12 : isSelected ? 1 : isHovered ? 0.9 : 0.6;
-    strokeWidth = isSelected ? 3 : isHovered ? 2.5 : 1.8;
+    // INCREASED BASE OPACITY: Boosted from 0.35 to 0.6 to resolve user feedback about faintness
+    edgeOpacity = !isFocused ? 0.6 : isSelected ? 1 : isHovered ? 0.9 : 0.75;
+    // INCREASED ACTIVE STROKE: Active paths now thicken more aggressively.
+    strokeWidth = isSelected ? 3.5 : isHovered ? 3 : 2;
   }
 
   return (
@@ -170,7 +172,7 @@ export function ActionEdge({
               zIndex: isSelected ? 100 : 50,
               opacity: isPreviewMode
                 ? isPreviewActive ? 1 : isPreviewPast ? 0.6 : 0.15
-                : !isFocused ? 0.15 : 1,
+                : !isFocused ? 0.55 : 1,
               transition: 'opacity 0.2s',
             }}
           className="nodrag nopan"
@@ -237,7 +239,6 @@ export function ActionEdge({
               display: 'inline-block',
             }} />
             <ActionIcon className="w-4 h-4 text-white shrink-0" />
-            {showFull && (
               <div className="flex items-baseline gap-2">
                 {data?.actionId && (
                    <span style={{ fontSize: 13, fontWeight: 900, color: 'rgba(255,255,255,0.9)', letterSpacing: '0.05em' }}>
@@ -247,11 +248,7 @@ export function ActionEdge({
                 <span className="text-white" style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
                   {trunc(data?.actionLabel || def.label)}
                 </span>
-                {!isPreviewMode && (
-                  <ChevronDown className="text-white/70 group-hover:text-white transition-colors" style={{ width: 12, height: 12 }} />
-                )}
               </div>
-            )}
           </button>
 
           {/* No inline dropdown - using Properties Panel instead */}

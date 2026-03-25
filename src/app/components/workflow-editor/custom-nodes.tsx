@@ -81,8 +81,8 @@ const HANDLE_STYLE = {
   borderRadius: '50%',
 };
 
-const AVATAR_R    = 24;   // radius of circle
-const AVATAR_DIAM = AVATAR_R * 2;
+const AVATAR_R    = 20;   // radius of head circle
+const AVATAR_DIAM = AVATAR_R * 2; // 40px
 
 // ─── Role Node — compact org-chart badge ──────────────────────────────────────
 export const RoleNode = memo(({ id, data, selected }: NodeProps<RoleNodeData>) => {
@@ -104,9 +104,22 @@ export const RoleNode = memo(({ id, data, selected }: NodeProps<RoleNodeData>) =
     ? `0 0 0 3px ${TEAL}, 0 6px 20px rgba(0,132,132,0.2)`
     : '0 3px 14px rgba(0,0,0,0.10)';
 
-  const avatarBg = isGroup
-    ? 'linear-gradient(145deg, #7c3aed, #5b21b6)'
-    : `linear-gradient(145deg, ${TEAL}, ${TEAL_DARK})`;
+  let avatarBg = `linear-gradient(145deg, ${TEAL}, ${TEAL_DARK})`; // Default
+  const labelLower = label.toLowerCase();
+
+  if (labelLower.includes('ncahp')) {
+    // Teal (Primary logo color)
+    avatarBg = `linear-gradient(145deg, ${TEAL}, ${TEAL_DARK})`;
+  } else if (labelLower.includes('state council')) {
+    // Amber/Gold (Logo petals)
+    avatarBg = 'linear-gradient(145deg, #f59e0b, #d97706)';
+  } else if (labelLower.includes('external')) {
+    // Red (Logo swoosh)
+    avatarBg = 'linear-gradient(145deg, #ef4444, #dc2626)';
+  } else if (isGroup) {
+    // Purple fallback for generic groups
+    avatarBg = 'linear-gradient(145deg, #7c3aed, #5b21b6)';
+  }
 
   // CARD WIDTH: narrower since no "Actual Role" header row
   const CARD_W = 148;
@@ -114,104 +127,105 @@ export const RoleNode = memo(({ id, data, selected }: NodeProps<RoleNodeData>) =
   return (
     <div style={{
       position: 'relative',
-      width: CARD_W,
-      paddingTop: AVATAR_R,      // half-circle protrudes above card top
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
       opacity: cardOpacity,
       transition: 'opacity 0.3s',
+      // We do not want fixed width, let pill define width or center it
     }}>
 
-      {/* Pulsing preview ring */}
-      {isPreviewActive && (
-        <div style={{
-          position: 'absolute', top: -4, left: '50%',
-          transform: 'translateX(-50%)',
-          width: AVATAR_DIAM + 12, height: AVATAR_DIAM + 12,
-          borderRadius: '50%',
-          border: '2.5px solid #f27e00',
-          animation: 'nodePreviewPulse 1.2s ease-in-out infinite',
-          pointerEvents: 'none', zIndex: 0,
-        }} />
-      )}
-
-      {/* Past checkmark badge */}
-      {isPreviewPast && (
-        <div style={{
-          position: 'absolute', top: 2, right: 0,
-          width: 17, height: 17, borderRadius: '50%',
-          backgroundColor: '#10b981', border: '2px solid white',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30,
-        }}>
-          <CheckCircle2 style={{ width: 10, height: 10, color: 'white' }} />
-        </div>
-      )}
-
-      {/* Avatar circle (half above card) */}
-      <div style={{
-        position: 'absolute', top: 0, left: '50%',
-        transform: 'translateX(-50%)',
-        width: AVATAR_DIAM, height: AVATAR_DIAM, borderRadius: '50%',
-        background: avatarBg,
-        border: '2.5px solid white',
-        boxShadow: '0 3px 10px rgba(0,0,0,0.16)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 10,
-      }}>
-        {isGroup
-          ? <Users style={{ width: 18, height: 18, color: 'white' }} />
-          : initials
-          ? <span style={{ fontSize: 13, fontWeight: 800, color: 'white', letterSpacing: '-0.02em' }}>{initials}</span>
-          : <User style={{ width: 18, height: 18, color: 'white' }} />}
-      </div>
-
-      {/* Name plate — compact, no header row */}
+      {/* ── Pill for Role Name (above user icon) ── */}
       <div style={{
         backgroundColor: 'white',
-        borderRadius: 12,
         border: `2px solid ${borderColor}`,
+        borderRadius: 20,
+        padding: '5px 14px',
         boxShadow,
-        paddingTop: AVATAR_R + 5,
-        paddingBottom: 9,
-        paddingLeft: 9,
-        paddingRight: 9,
-        textAlign: 'center',
+        marginBottom: 6,
+        whiteSpace: 'nowrap',
+        zIndex: 20,
+        position: 'relative', // so shadows show correctly
         transition: 'border-color 0.15s, box-shadow 0.15s',
-        position: 'relative',
-        zIndex: 5,
       }}>
-            <div className="flex flex-row items-center justify-center gap-1.5 flex-wrap">
-              <p style={{
-                fontSize: 13,
-                fontWeight: 700,
-                color: '#111827',
-                lineHeight: 1.3,
-                /* show the full combined label, e.g. "CLERK — NCAHP" */
-                wordBreak: 'break-word',
-              }}>
-                {label}
-              </p>
-              {data.roleId && (
-                <span style={{
-                  fontSize: 10,
-                  fontWeight: 800,
-                  color: 'white',
-                  backgroundColor: borderColor,
-                  padding: '2px 6px',
-                  borderRadius: 6,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
-                }}>
-                  ID: {data.roleId}
-                </span>
-              )}
-            </div>
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#111827', letterSpacing: '0.02em' }}>
+          {label || 'Select Role'}
+        </span>
       </div>
 
-      {/* Handles */}
+      {/* ── User Icon Container ── */}
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+
+        {/* Pulsing preview ring (around head) */}
+        {isPreviewActive && (
+          <div style={{
+            position: 'absolute', top: -4, left: '50%',
+            transform: 'translateX(-50%)',
+            width: AVATAR_DIAM + 12, height: AVATAR_DIAM + 12,
+            borderRadius: '50%',
+            border: '2.5px solid #f27e00',
+            animation: 'nodePreviewPulse 1.2s ease-in-out infinite',
+            pointerEvents: 'none', zIndex: 0,
+          }} />
+        )}
+
+        {/* Past checkmark badge */}
+        {isPreviewPast && (
+          <div style={{
+            position: 'absolute', top: -2, right: -4,
+            width: 17, height: 17, borderRadius: '50%',
+            backgroundColor: '#10b981', border: '2px solid white',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30,
+          }}>
+            <CheckCircle2 style={{ width: 10, height: 10, color: 'white' }} />
+          </div>
+        )}
+
+        {/* Head (Face of User Icon) */}
+        <div style={{
+          width: AVATAR_DIAM, height: AVATAR_DIAM, borderRadius: '50%',
+          background: avatarBg,
+          border: `2px solid white`,
+          boxShadow: '0 3px 8px rgba(0,0,0,0.15)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 10,
+          position: 'relative'
+        }}>
+          {data.roleId ? (
+            <span style={{ fontSize: 13, fontWeight: 900, color: 'white', letterSpacing: '0.02em', marginTop: 1 }}>
+              {data.roleId}
+            </span>
+          ) : isGroup ? (
+            <Users style={{ width: 18, height: 18, color: 'white' }} />
+          ) : initials ? (
+            <span style={{ fontSize: 14, fontWeight: 800, color: 'white' }}>{initials}</span>
+          ) : (
+            <User style={{ width: 18, height: 18, color: 'white' }} />
+          )}
+        </div>
+
+        {/* Shoulders (Body of User Icon) */}
+        <div style={{
+          width: AVATAR_DIAM + 28, // e.g. 68px wide body
+          height: 28,
+          background: avatarBg, // fixed from backgroundColor for gradients
+          borderTopLeftRadius: 34,
+          borderTopRightRadius: 34,
+          marginTop: -6, // generously overlap with head to form neck area
+          boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+          border: `2px solid white`,
+          borderBottom: 'none',
+          zIndex: 5,
+        }} />
+
+        {/* Handles that connect to the User Icon */}
+        <Handle type="target" position={Position.Left}   id="tgt-left"   style={{ ...HANDLE_STYLE, left: -5, top: '65%' }} />
+        <Handle type="source" position={Position.Bottom} id="src-bottom" style={{ ...HANDLE_STYLE, bottom: -5 }} />
+        <Handle type="source" position={Position.Right}  id="src-right"  style={{ ...HANDLE_STYLE, right: -5, top: '65%' }} />
+      </div>
+
+      {/* Top Handle connects to the Pill */}
       <Handle type="target" position={Position.Top}    id="tgt-top"    style={{ ...HANDLE_STYLE, top: 0 }} />
-      <Handle type="target" position={Position.Left}   id="tgt-left"   style={{ ...HANDLE_STYLE, left: -5, top: '60%' }} />
-      <Handle type="source" position={Position.Bottom} id="src-bottom" style={{ ...HANDLE_STYLE, bottom: -5 }} />
-      <Handle type="source" position={Position.Right}  id="src-right"  style={{ ...HANDLE_STYLE, right: -5, top: '60%' }} />
     </div>
   );
 });

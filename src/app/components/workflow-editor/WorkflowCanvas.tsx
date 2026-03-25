@@ -23,7 +23,7 @@ import NodePalette from './NodePalette';
 import PropertiesPanel from './PropertiesPanel';
 import ActionPropertiesPanel from './ActionPropertiesPanel';
 import EditorToolbar from './EditorToolbar';
-import WorkflowPreviewModal from './WorkflowPreviewModal';
+import ApplicationTypeModal from './ApplicationTypeModal';
 import { WorkflowContext } from './WorkflowContext';
 import {
   buildSwimlaneNodes,
@@ -31,48 +31,9 @@ import {
   STAGE_CONFIG,
   STAGE_BAND_HEIGHT,
   SWIMLANE_WIDTH,
+  ROLE_LIBRARY,
 } from './mock-data';
 import type { WorkflowDefinition, RoleNodeData, StageId, SwimlaneNodeData, ActionEdgeData } from './types';
-
-// ─── Global keyframe animations (injected once) ───────────────────────────────
-const PREVIEW_CSS = `
-@keyframes nodePreviewPulse {
-  0%   { opacity: 1;    transform: scale(1); }
-  50%  { opacity: 0.55; transform: scale(1.08); }
-  100% { opacity: 1;    transform: scale(1); }
-}
-@keyframes edgeFlowDash {
-  from { stroke-dashoffset: 46; }
-  to   { stroke-dashoffset: 0; }
-}
-@keyframes slideUpPanel {
-  from { opacity: 0; transform: translateY(24px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes pathDraw {
-  from { stroke-dashoffset: 1; }
-  to   { stroke-dashoffset: 0; }
-}
-@keyframes nodeGlowPulse {
-  0%, 100% { opacity: 0.22; transform: scale(1); }
-  50%       { opacity: 0.10; transform: scale(1.18); }
-}
-@keyframes fadeInTooltip {
-  from { opacity: 0; transform: translateX(-50%) translateY(3px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-`;
-
-function injectCSS(css: string, id: string) {
-  if (typeof document === 'undefined' || document.getElementById(id)) return;
-  const style = document.createElement('style');
-  style.id = id;
-  style.textContent = css;
-  document.head.appendChild(style);
-}
-
-// Inject once at module level
-injectCSS(PREVIEW_CSS, 'workflow-preview-css');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 interface WorkflowCanvasProps {
@@ -129,12 +90,10 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
   const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(false);
 
-  // ── Preview state ─────────────────────────────────────────────────────────
-  const [showPreview, setShowPreview] = useState(false);
-  const [previewActiveNodeId, setPreviewActiveNodeId] = useState<string | null>(null);
-  const [previewActiveEdgeId, setPreviewActiveEdgeId] = useState<string | null>(null);
-  const [previewPastNodeIds, setPreviewPastNodeIds] = useState<ReadonlySet<string>>(new Set());
-  const [previewPastEdgeIds, setPreviewPastEdgeIds] = useState<ReadonlySet<string>>(new Set());
+  // ── Print / Publish state ─────────────────────────────────────────────────────────
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [showPrintView, setShowPrintView] = useState(false);
+  const [selectedAppTypes, setSelectedAppTypes] = useState<string[]>([]);
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { project, fitView } = useReactFlow();
@@ -151,36 +110,36 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
 
   // ── Node click ────────────────────────────────────────────────────────────
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
-    if (showPreview) return;
+    if (showPrintView) return;
     if (node.type !== 'roleNode' && node.type !== 'swimlaneNode') return;
     setSelectedEdge(null);
     setSelectedNode(node as Node<RoleNodeData>);
-    setShowRightPanel(true);
-  }, [showPreview]);
+    setShowRightPanel(false);
+  }, [showPrintView]);
 
   const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
-    if (showPreview) return;
+    if (showPrintView) return;
     setSelectedNode(null);
     setSelectedEdge(edge as Edge<ActionEdgeData>);
     setShowRightPanel(true);
-  }, [showPreview]);
+  }, [showPrintView]);
 
   const openEdgeProperties = useCallback((id: string) => {
-    if (showPreview) return;
+    if (showPrintView) return;
     const edge = edges.find((e) => e.id === id);
     if (edge) {
       setSelectedNode(null);
       setSelectedEdge(edge as Edge<ActionEdgeData>);
       setShowRightPanel(true);
     }
-  }, [showPreview, edges]);
+  }, [showPrintView, edges]);
 
   const onPaneClick = useCallback(() => {
-    if (showPreview) return;
+    if (showPrintView) return;
     setSelectedNode(null);
     setSelectedEdge(null);
     setShowRightPanel(false);
-  }, [showPreview]);
+  }, [showPrintView]);
 
   // ── Drag over ─────────────────────────────────────────────────────────────
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -192,7 +151,7 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
-      if (isLocked || showPreview) return;
+      if (isLocked || showPrintView) return;
 
       const nodeType = event.dataTransfer.getData('application/reactflow-type');
       if (!nodeType) return;
@@ -237,11 +196,14 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
       // Drop a Role Node
       if (nodeType === 'roleNode') {
         const stage = getStageFromY(position.y);
+        const roleId = event.dataTransfer.getData('application/reactflow-role');
+        const roleDef = roleId ? ROLE_LIBRARY.find(r => r.id === roleId) : null;
+        
         const newNode: Node<RoleNodeData> = {
           id: genId(),
           type: 'roleNode',
           position,
-          data: { label: '', stage },
+          data: { label: roleDef?.label ?? '', stage, roleId: roleDef?.id },
           zIndex: 10,
         };
         setNodes((nds: Node[]) => [...nds, newNode]);
@@ -249,15 +211,18 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
         setShowRightPanel(true);
       }
     },
-    [project, setNodes, isLocked, nodes, showPreview]
+    [project, setNodes, isLocked, nodes, showPrintView]
   );
 
   // ── Drag start (from palette) ─────────────────────────────────────────────
   const onDragStart = useCallback(
-    (event: React.DragEvent, nodeType: string, stageId?: string) => {
+    (event: React.DragEvent, nodeType: string, stageId?: string, roleId?: string) => {
       event.dataTransfer.setData('application/reactflow-type', nodeType);
       if (stageId) {
         event.dataTransfer.setData('application/reactflow-stage', stageId);
+      }
+      if (roleId) {
+        event.dataTransfer.setData('application/reactflow-role', roleId);
       }
       event.dataTransfer.effectAllowed = 'move';
     },
@@ -266,7 +231,7 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
 
   // ── Click to add stage (from palette) ─────────────────────────────────────
   const handleAddStage = useCallback((stageId: StageId) => {
-    if (isLocked || showPreview) return;
+    if (isLocked || showPrintView) return;
     const conf = STAGE_CONFIG[stageId];
     if (!conf) return;
 
@@ -291,7 +256,32 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
     };
     setNodes((nds: Node[]) => [...nds, newLane]);
     toast.success(`${conf.label} lane added`);
-  }, [isLocked, showPreview, nodes, setNodes, project]);
+  }, [isLocked, showPrintView, nodes, setNodes, project]);
+
+  // ── Click to add role (from palette) ──────────────────────────────────────
+  const handleAddRole = useCallback((roleId: string) => {
+    if (isLocked || showPrintView) return;
+    const roleDef = ROLE_LIBRARY.find((r) => r.id === roleId);
+    if (!roleDef) return;
+
+    const bounds = reactFlowWrapper.current?.getBoundingClientRect();
+    const centerX = bounds ? bounds.width / 2 : window.innerWidth / 2;
+    const centerY = bounds ? bounds.height / 2 : window.innerHeight / 2;
+    const { x, y } = project({ x: centerX - 40, y: centerY - 40 });
+    const stage = getStageFromY(y);
+
+    const newNode: Node<RoleNodeData> = {
+      id: genId(),
+      type: 'roleNode',
+      position: { x, y },
+      data: { label: roleDef.label, stage, roleId },
+      zIndex: 10,
+    };
+    setNodes((nds: Node[]) => [...nds, newNode]);
+    setSelectedNode(newNode);
+    setShowRightPanel(true);
+    toast.success(`${roleDef.label} added`);
+  }, [isLocked, showPrintView, project, setNodes]);
 
   // ── Node update ───────────────────────────────────────────────────────────
   const handleNodeUpdate = useCallback(
@@ -385,35 +375,32 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
     toast.success('Workflow exported');
   }, [nodes, edges, workflow.name]);
 
-  // ── Preview ───────────────────────────────────────────────────────────────
+  // ── Publish / Print ───────────────────────────────────────────────────────────────
+  const handleOpenPublishModal = useCallback(() => {
+    setSelectedNode(null);
+    setShowRightPanel(false);
+    setShowPublishModal(true);
+  }, []);
+
+  const handleApplyPublish = useCallback((types: string[]) => {
+    setSelectedAppTypes(types);
+    setShowPublishModal(false);
+    toast.success(`Workflow published for ${types.length} application type(s)!`);
+  }, []);
+
   const handleOpenPreview = useCallback(() => {
     setSelectedNode(null);
     setShowRightPanel(false);
-    setShowPreview(true);
-  }, []);
+    setShowLeftPanel(false);
+    setShowPrintView(true);
+    setTimeout(() => fitView({ padding: 0.1 }), 50);
+  }, [fitView]);
 
-  const handleClosePreview = useCallback(() => {
-    setShowPreview(false);
-    setPreviewActiveNodeId(null);
-    setPreviewActiveEdgeId(null);
-    setPreviewPastNodeIds(new Set());
-    setPreviewPastEdgeIds(new Set());
-  }, []);
-
-  const handlePreviewStepChange = useCallback(
-    (params: {
-      activeNodeId: string | null;
-      activeEdgeId: string | null;
-      pastNodeIds: Set<string>;
-      pastEdgeIds: Set<string>;
-    }) => {
-      setPreviewActiveNodeId(params.activeNodeId);
-      setPreviewActiveEdgeId(params.activeEdgeId);
-      setPreviewPastNodeIds(params.pastNodeIds);
-      setPreviewPastEdgeIds(params.pastEdgeIds);
-    },
-    []
-  );
+  const handleClosePrintView = useCallback(() => {
+    setShowPrintView(false);
+    setShowLeftPanel(true);
+    setTimeout(() => fitView({ padding: 0.1 }), 50);
+  }, [fitView]);
 
   // ── MiniMap color ─────────────────────────────────────────────────────────
   const minimapColor = (node: Node) => {
@@ -428,35 +415,74 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
   const contextValue = {
     selectedNodeId: selectedNode?.id ?? null,
     selectedEdgeId: selectedEdge?.id ?? null,
-    isPreviewMode: showPreview,
-    previewActiveNodeId,
-    previewActiveEdgeId,
-    previewPastNodeIds,
-    previewPastEdgeIds,
+    isPreviewMode: false,
+    previewActiveNodeId: null,
+    previewActiveEdgeId: null,
+    previewPastNodeIds: new Set<string>(),
+    previewPastEdgeIds: new Set<string>(),
     openEdgeProperties,
   };
 
   return (
     <WorkflowContext.Provider value={contextValue}>
-      <div className="h-screen flex flex-col" style={{ backgroundColor: '#f8fafc' }}>
-        <EditorToolbar
-          workflowName={workflow.name}
-          workflowStatus={workflow.status}
-          isLocked={isLocked}
-          onToggleLock={() => setIsLocked((v) => !v)}
-          onSave={handleSave}
-          onPublish={handlePublish}
-          onDeleteSelected={handleDeleteSelected}
-          onAutoLayout={handleAutoLayout}
-          onExport={handleExport}
-          onBack={onBack}
-          onPreview={handleOpenPreview}
-          hasSelection={!!selectedNode || !!selectedEdge}
-        />
+      <div className="h-screen flex flex-col" style={{ backgroundColor: showPrintView ? 'white' : '#f8fafc' }}>
+        
+        {/* ── Printable Header ────────────────────────────────────────── */}
+        {showPrintView && (
+          <div className="flex items-center justify-between p-6 bg-white border-b print:hidden shrink-0 z-50 relative">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">{workflow.name}</h1>
+              <p className="text-sm text-gray-500 mt-1">
+                Applied to: {selectedAppTypes.length} Application Type{selectedAppTypes.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => window.print()}
+                className="px-6 py-2 text-white font-bold rounded-lg transition"
+                style={{ backgroundColor: '#008484' }}
+              >
+                Print / Save PDF
+              </button>
+              <button 
+                onClick={handleClosePrintView}
+                className="px-6 py-2 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition"
+              >
+                Close Output
+              </button>
+            </div>
+          </div>
+        )}
+
+        <style>
+          {`
+            @media print {
+              html, body { background: white !important; margin: 0; padding: 0; }
+              .react-flow__renderer { background: white !important; }
+            }
+          `}
+        </style>
+
+        {!showPrintView && (
+          <EditorToolbar
+            workflowName={workflow.name}
+            workflowStatus={workflow.status}
+            isLocked={isLocked}
+            onToggleLock={() => setIsLocked((v) => !v)}
+            onSave={handleSave}
+            onPublish={handleOpenPublishModal}
+            onDeleteSelected={handleDeleteSelected}
+            onAutoLayout={handleAutoLayout}
+            onExport={handleExport}
+            onBack={onBack}
+            onPreview={handleOpenPreview}
+            hasSelection={!!selectedNode || !!selectedEdge}
+          />
+        )}
 
         <div className="flex-1 flex overflow-hidden relative">
           {/* ── Left panel ────────────────────────────────────── */}
-          {!showPreview && (
+          {!showPrintView && (
             <div
               className="shrink-0 overflow-hidden transition-all duration-300"
               style={{
@@ -478,14 +504,14 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
                   </p>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4">
-                  <NodePalette onDragStart={onDragStart} onAddStage={handleAddStage} />
+                  <NodePalette onDragStart={onDragStart} onAddStage={handleAddStage} onAddRole={handleAddRole} />
                 </div>
               </div>
             </div>
           )}
 
           {/* Toggle Left */}
-          {!showPreview && (
+          {!showPrintView && (
             <button
               onClick={() => setShowLeftPanel((v) => !v)}
               className="absolute top-3 z-30 w-8 h-8 rounded-lg bg-white border border-gray-200 shadow-sm flex items-center justify-center hover:bg-gray-50 transition-all"
@@ -504,9 +530,9 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
             <ReactFlow
               nodes={nodes}
               edges={edges}
-               onNodesChange={isLocked || showPreview ? undefined : onNodesChange}
-              onEdgesChange={isLocked || showPreview ? undefined : onEdgesChange}
-              onConnect={isLocked || showPreview ? undefined : onConnect}
+              onNodesChange={isLocked || showPrintView ? undefined : onNodesChange}
+              onEdgesChange={isLocked || showPrintView ? undefined : onEdgesChange}
+              onConnect={isLocked || showPrintView ? undefined : onConnect}
               onNodeClick={onNodeClick}
               onEdgeClick={onEdgeClick}
               onPaneClick={onPaneClick}
@@ -525,23 +551,30 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
               deleteKeyCode={null}
               selectNodesOnDrag={false}
               elevateNodesOnSelect={false}
+              nodesDraggable={!showPrintView && !isLocked}
+              nodesConnectable={!showPrintView && !isLocked}
+              elementsSelectable={!showPrintView}
             >
-              <Background
-                variant={BackgroundVariant.Dots}
-                gap={24}
-                size={1.2}
-                color="#d1d5db"
-              />
-              <Controls showInteractive={false} style={{ bottom: 24, left: 24 }} />
-              <MiniMap
-                nodeColor={minimapColor}
-                maskColor="rgba(0,0,0,0.06)"
-                style={{ width: 170, height: 110, borderRadius: 12, border: '1px solid #e5e7eb' }}
-              />
+              {!showPrintView && (
+                <Background
+                  variant={BackgroundVariant.Dots}
+                  gap={24}
+                  size={1.2}
+                  color="#d1d5db"
+                />
+              )}
+              {!showPrintView && <Controls showInteractive={false} style={{ bottom: 24, left: 24 }} />}
+              {!showPrintView && (
+                <MiniMap
+                  nodeColor={minimapColor}
+                  maskColor="rgba(0,0,0,0.06)"
+                  style={{ width: 170, height: 110, borderRadius: 12, border: '1px solid #e5e7eb' }}
+                />
+              )}
             </ReactFlow>
 
             {/* Empty-canvas hint */}
-            {!showPreview && nodes.filter((n) => n.type === 'roleNode').length === 0 && (
+            {!showPrintView && nodes.filter((n) => n.type === 'roleNode').length === 0 && (
               <div
                 className="absolute inset-0 flex items-center justify-center pointer-events-none"
                 style={{ zIndex: 10 }}
@@ -565,19 +598,17 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
               </div>
             )}
 
-            {/* ── Preview modal overlay ──────────────────────── */}
-            {showPreview && (
-              <WorkflowPreviewModal
-                nodes={nodes}
-                edges={edges}
-                onClose={handleClosePreview}
-                onStepChange={handlePreviewStepChange}
+            {/* ── Application Type Modal overlay ──────────────────────── */}
+            {showPublishModal && (
+              <ApplicationTypeModal
+                onClose={() => setShowPublishModal(false)}
+                onApply={handleApplyPublish}
               />
             )}
           </div>
 
           {/* Toggle Right */}
-          {!showPreview && (selectedNode || selectedEdge) && (
+          {!showPrintView && (selectedNode || selectedEdge) && (
             <button
               onClick={() => setShowRightPanel((v) => !v)}
               className="absolute top-3 z-30 w-8 h-8 rounded-lg bg-white border border-gray-200 shadow-sm flex items-center justify-center hover:bg-gray-50 transition-all"
@@ -592,7 +623,7 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
           )}
 
           {/* ── Right panel ───────────────────────────────────── */}
-          {!showPreview && (
+          {!showPrintView && (
             <div
               className="shrink-0 overflow-hidden transition-all duration-300"
               style={{
