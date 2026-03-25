@@ -178,22 +178,33 @@ export const RoleNode = memo(({ id, data, selected }: NodeProps<RoleNodeData>) =
         position: 'relative',
         zIndex: 5,
       }}>
-        {label ? (
-          <p style={{
-            fontSize: 13,
-            fontWeight: 700,
-            color: '#111827',
-            lineHeight: 1.3,
-            /* show the full combined label, e.g. "CLERK — NCAHP" */
-            wordBreak: 'break-word',
-          }}>
-            {label}
-          </p>
-        ) : (
-          <p style={{ fontSize: 12, color: '#d1d5db', fontStyle: 'italic' }}>
-            Set role name
-          </p>
-        )}
+            <div className="flex flex-row items-center justify-center gap-1.5 flex-wrap">
+              <p style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: '#111827',
+                lineHeight: 1.3,
+                /* show the full combined label, e.g. "CLERK — NCAHP" */
+                wordBreak: 'break-word',
+              }}>
+                {label}
+              </p>
+              {data.roleId && (
+                <span style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  color: 'white',
+                  backgroundColor: borderColor,
+                  padding: '2px 6px',
+                  borderRadius: 6,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                }}>
+                  ID: {data.roleId}
+                </span>
+              )}
+            </div>
       </div>
 
       {/* Handles */}

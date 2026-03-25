@@ -32,8 +32,8 @@ export default function PropertiesPanel({
     onUpdate(node.id, { ...data, [key]: value });
   };
 
-  const selectPreset = (label: string) => {
-    onUpdate(node.id, { ...data, label });
+  const selectPreset = (role: { id: string; label: string }) => {
+    onUpdate(node.id, { ...data, label: role.label, roleId: role.id });
     setShowDropdown(false);
   };
 
@@ -117,7 +117,7 @@ export default function PropertiesPanel({
                   return (
                     <button
                       key={i}
-                      onMouseDown={() => selectPreset(r.label)}
+                      onMouseDown={() => selectPreset(r)}
                       className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-gray-50"
                       style={{ backgroundColor: isActive ? '#f0fafa' : 'transparent' }}
                     >
@@ -136,6 +136,22 @@ export default function PropertiesPanel({
           <p className="mt-1.5 text-gray-400" style={{ fontSize: 10 }}>
             Format: <span style={{ fontStyle: 'italic' }}>Role Name — Council</span>
           </p>
+        </div>
+
+        {/* ── Role ID ───────────────────────────────────────── */}
+        <div>
+          <label
+            className="flex items-center gap-1.5 uppercase tracking-widest text-gray-400 mb-1.5"
+            style={{ fontSize: 9, fontWeight: 700 }}
+          >
+            Role ID
+          </label>
+          <div
+            className={inputClass}
+            style={{ fontSize: 13, backgroundColor: '#f9fafb', color: '#6b7280', cursor: 'not-allowed' }}
+          >
+            {data.roleId || 'Auto-assigned on selection'}
+          </div>
         </div>
 
         {/* ── Node ID ──────────────────────────────────────── */}

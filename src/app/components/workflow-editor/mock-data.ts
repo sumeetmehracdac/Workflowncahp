@@ -72,21 +72,12 @@ export const STAGE_BAND_HEIGHT = 160;
 export const STAGE_GAP = 20;
 
 // ─── Role Library (autocomplete suggestions) ──────────────────────────────────
-export const ROLE_LIBRARY: { label: string }[] = [
-  { label: 'Clerk — NCAHP' },
-  { label: 'Section Officer — NCAHP' },
-  { label: 'Under Secretary — NCAHP' },
-  { label: 'Deputy Secretary — NCAHP' },
-  { label: 'Joint Secretary — NCAHP' },
-  { label: 'Secretary — NCAHP' },
-  { label: 'Verification Officer — NCAHP' },
-  { label: 'Finance Officer — NCAHP' },
-  { label: 'President — State Council (HP)' },
-  { label: 'Registrar — State Council (HP)' },
-  { label: 'President — State Council (Haryana)' },
-  { label: 'Registrar — State Council (Haryana)' },
-  { label: 'Technical Committee — NCAHP' },
-  { label: 'Ethics Committee — NCAHP' },
+export const ROLE_LIBRARY: { id: string, label: string }[] = [
+  { id: '01', label: 'Admin - External' },
+  { id: '02', label: 'Applicant - External' },
+  { id: '03', label: 'Secretary - NCAHP' },
+  { id: '04', label: 'Secretary - Uttar Pradesh State Council' },
+  { id: '05', label: 'Developer - External' },
 ];
 
 // ─── Form Types ───────────────────────────────────────────────────────────────
@@ -119,7 +110,7 @@ export function buildSwimlaneNodes(): Node[] {
       position: { x: 0, y: conf.y },
       data: { stage },
       draggable: true,
-      selectable: false,   // ← prevents z-index elevation on click
+      selectable: true,    // ← allow selection for removal
       focusable: false,    // ← prevents keyboard focus elevation
       connectable: false,
       style: { width: SWIMLANE_WIDTH, height: STAGE_BAND_HEIGHT },
@@ -143,7 +134,7 @@ export const sampleWorkflows: WorkflowDefinition[] = [
         id: 'r-s1',
         type: 'roleNode',
         position: { x: 80, y: 30 },
-        data: { label: 'Clerk — NCAHP', stage: 'submission' },
+        data: { label: 'Applicant - External', stage: 'submission', roleId: '01' },
       },
       {
         id: 'r-v1',
@@ -161,7 +152,7 @@ export const sampleWorkflows: WorkflowDefinition[] = [
         id: 'r-e2a',
         type: 'roleNode',
         position: { x: 60, y: 570 },
-        data: { label: 'Technical Committee — NCAHP', stage: 'evaluation2' },
+        data: { label: 'Technical Committee — NCAHP', stage: 'evaluation2', roleId: '09' },
       },
       {
         id: 'r-e2b',
@@ -171,7 +162,7 @@ export const sampleWorkflows: WorkflowDefinition[] = [
       },
     ],
     edges: [
-      { id: 'e1', source: 'r-s1',  target: 'r-v1',  type: 'actionEdge', data: { action: 'forward' } },
+      { id: 'e1', source: 'r-s1',  target: 'r-v1',  type: 'actionEdge', data: { action: 'forward', actionId: '01' } },
       { id: 'e2', source: 'r-v1',  target: 'r-e1',  type: 'actionEdge', data: { action: 'approve' } },
       { id: 'e3', source: 'r-v1',  target: 'r-s1',  type: 'actionEdge', data: { action: 'send_back' } },
       { id: 'e4', source: 'r-e1',  target: 'r-e2a', type: 'actionEdge', data: { action: 'forward' } },

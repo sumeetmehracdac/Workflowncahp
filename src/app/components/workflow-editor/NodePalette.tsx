@@ -5,11 +5,12 @@ import type { StageId } from './types';
 
 interface NodePaletteProps {
   onDragStart: (event: React.DragEvent, nodeType: string, stageId?: string) => void;
+  onAddStage?: (stageId: StageId) => void;
 }
 
 const TEAL = '#008484';
 
-export default function NodePalette({ onDragStart }: NodePaletteProps) {
+export default function NodePalette({ onDragStart, onAddStage }: NodePaletteProps) {
   return (
     <div className="flex flex-col gap-6 h-full">
 
@@ -75,8 +76,9 @@ export default function NodePalette({ onDragStart }: NodePaletteProps) {
               <div
                 key={stage}
                 draggable
+                onClick={() => onAddStage && onAddStage(stage)}
                 onDragStart={(e) => onDragStart(e, 'swimlaneNode', stage)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-grab active:cursor-grabbing transition-all"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-grab active:cursor-grabbing transition-all hover:bg-gray-50"
                 style={{
                   backgroundColor: conf.lightBg,
                   border: `1.5px dashed ${conf.borderColor}`,

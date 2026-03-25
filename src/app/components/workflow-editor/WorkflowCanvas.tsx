@@ -21,6 +21,7 @@ import { nodeTypes } from './custom-nodes';
 import { edgeTypes } from './ActionEdge';
 import NodePalette from './NodePalette';
 import PropertiesPanel from './PropertiesPanel';
+import ActionPropertiesPanel from './ActionPropertiesPanel';
 import EditorToolbar from './EditorToolbar';
 import WorkflowPreviewModal from './WorkflowPreviewModal';
 import { WorkflowContext } from './WorkflowContext';
@@ -31,7 +32,7 @@ import {
   STAGE_BAND_HEIGHT,
   SWIMLANE_WIDTH,
 } from './mock-data';
-import type { WorkflowDefinition, RoleNodeData, StageId, SwimlaneNodeData } from './types';
+import type { WorkflowDefinition, RoleNodeData, StageId, SwimlaneNodeData, ActionEdgeData } from './types';
 
 // ─── Global keyframe animations (injected once) ───────────────────────────────
 const PREVIEW_CSS = `
@@ -123,6 +124,7 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
   );
 
   const [selectedNode, setSelectedNode] = useState<Node<RoleNodeData> | null>(null);
+  const [selectedEdge, setSelectedEdge] = useState<Edge<ActionEdgeData> | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(false);
@@ -140,7 +142,7 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
   // ── Connection ────────────────────────────────────────────────────────────
   const onConnect = useCallback(
     (params: Connection) => {
-      setEdges((eds) =>
+      setEdges((eds: Edge[]) =>
         addEdge({ ...params, ...DEFAULT_EDGE_OPTIONS, id: `e-${Date.now()}` }, eds)
       );
     },
@@ -150,14 +152,33 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
   // ── Node click ────────────────────────────────────────────────────────────
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     if (showPreview) return;
-    if (node.type !== 'roleNode') return;
+    if (node.type !== 'roleNode' && node.type !== 'swimlaneNode') return;
+    setSelectedEdge(null);
     setSelectedNode(node as Node<RoleNodeData>);
     setShowRightPanel(true);
   }, [showPreview]);
 
+  const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
+    if (showPreview) return;
+    setSelectedNode(null);
+    setSelectedEdge(edge as Edge<ActionEdgeData>);
+    setShowRightPanel(true);
+  }, [showPreview]);
+
+  const openEdgeProperties = useCallback((id: string) => {
+    if (showPreview) return;
+    const edge = edges.find((e) => e.id === id);
+    if (edge) {
+      setSelectedNode(null);
+      setSelectedEdge(edge as Edge<ActionEdgeData>);
+      setShowRightPanel(true);
+    }
+  }, [showPreview, edges]);
+
   const onPaneClick = useCallback(() => {
     if (showPreview) return;
     setSelectedNode(null);
+    setSelectedEdge(null);
     setShowRightPanel(false);
   }, [showPreview]);
 
@@ -208,7 +229,7 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
           style: { width: SWIMLANE_WIDTH, height: conf.height },
           zIndex: -2,
         };
-        setNodes((nds) => [...nds, newLane]);
+        setNodes((nds: Node[]) => [...nds, newLane]);
         toast.success(`${conf.label} lane added`);
         return;
       }
@@ -223,7 +244,7 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
           data: { label: '', stage },
           zIndex: 10,
         };
-        setNodes((nds) => [...nds, newNode]);
+        setNodes((nds: Node[]) => [...nds, newNode]);
         setSelectedNode(newNode);
         setShowRightPanel(true);
       }
@@ -243,28 +264,73 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
     []
   );
 
+  // ── Click to add stage (from palette) ─────────────────────────────────────
+  const handleAddStage = useCallback((stageId: StageId) => {
+    if (isLocked || showPreview) return;
+    const conf = STAGE_CONFIG[stageId];
+    if (!conf) return;
+
+    const laneId = `__lane__${stageId}`;
+    const alreadyExists = nodes.some((n) => n.id === laneId);
+    if (alreadyExists) {
+      toast.info(`${conf.label} is already on the canvas`);
+      return;
+    }
+
+    const { x, y } = project({ x: 200, y: 100 + nodes.length * 150 });
+    const newLane: Node<SwimlaneNodeData> = {
+      id: laneId,
+      type: 'swimlaneNode',
+      position: { x, y },
+      data: { stage: stageId },
+      draggable: true,
+      selectable: true,
+      connectable: false,
+      style: { width: SWIMLANE_WIDTH, height: conf.height },
+      zIndex: -2,
+    };
+    setNodes((nds: Node[]) => [...nds, newLane]);
+    toast.success(`${conf.label} lane added`);
+  }, [isLocked, showPreview, nodes, setNodes, project]);
+
   // ── Node update ───────────────────────────────────────────────────────────
   const handleNodeUpdate = useCallback(
     (id: string, data: Record<string, unknown>) => {
-      setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data } : n)));
-      setSelectedNode((prev) =>
-        prev && prev.id === id ? ({ ...prev, data } as Node<RoleNodeData>) : prev
+      setNodes((nds: Node[]) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...data } } : n)));
+      setSelectedNode((prev: Node<RoleNodeData> | null) =>
+        prev && prev.id === id ? ({ ...prev, data: { ...prev.data, ...data } } as Node<RoleNodeData>) : prev
       );
     },
     [setNodes]
   );
 
+  // ── Edge update ───────────────────────────────────────────────────────────
+  const handleEdgeUpdate = useCallback(
+    (id: string, data: Record<string, unknown>) => {
+      setEdges((eds: Edge[]) => eds.map((e) => (e.id === id ? { ...e, data: { ...e.data, ...data } } : e)));
+      setSelectedEdge((prev: Edge<ActionEdgeData> | null) =>
+        prev && prev.id === id ? ({ ...prev, data: { ...prev.data, ...data } } as Edge<ActionEdgeData>) : prev
+      );
+    },
+    [setEdges]
+  );
+
   // ── Delete selected role ──────────────────────────────────────────────────
   const handleDeleteSelected = useCallback(() => {
-    if (!selectedNode) return;
-    setNodes((nds) => nds.filter((n) => n.id !== selectedNode.id));
-    setEdges((eds) =>
-      eds.filter((e) => e.source !== selectedNode.id && e.target !== selectedNode.id)
-    );
-    setSelectedNode(null);
+    if (selectedNode) {
+      setNodes((nds: Node[]) => nds.filter((n) => n.id !== selectedNode.id));
+      setEdges((eds: Edge[]) =>
+        eds.filter((e) => e.source !== selectedNode.id && e.target !== selectedNode.id)
+      );
+      setSelectedNode(null);
+      toast.success(selectedNode.type === 'swimlaneNode' ? 'Stage removed' : 'Role removed');
+    } else if (selectedEdge) {
+      setEdges((eds: Edge[]) => eds.filter((e) => e.id !== selectedEdge.id));
+      setSelectedEdge(null);
+      toast.success('Action removed');
+    }
     setShowRightPanel(false);
-    toast.success('Role removed');
-  }, [selectedNode, setNodes, setEdges]);
+  }, [selectedNode, selectedEdge, setNodes, setEdges]);
 
   // ── Auto layout ───────────────────────────────────────────────────────────
   const handleAutoLayout = useCallback(() => {
@@ -361,11 +427,13 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
   // ── Context value ─────────────────────────────────────────────────────────
   const contextValue = {
     selectedNodeId: selectedNode?.id ?? null,
+    selectedEdgeId: selectedEdge?.id ?? null,
     isPreviewMode: showPreview,
     previewActiveNodeId,
     previewActiveEdgeId,
     previewPastNodeIds,
     previewPastEdgeIds,
+    openEdgeProperties,
   };
 
   return (
@@ -383,7 +451,7 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
           onExport={handleExport}
           onBack={onBack}
           onPreview={handleOpenPreview}
-          hasSelection={!!selectedNode}
+          hasSelection={!!selectedNode || !!selectedEdge}
         />
 
         <div className="flex-1 flex overflow-hidden relative">
@@ -410,7 +478,7 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
                   </p>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4">
-                  <NodePalette onDragStart={onDragStart} />
+                  <NodePalette onDragStart={onDragStart} onAddStage={handleAddStage} />
                 </div>
               </div>
             </div>
@@ -436,10 +504,11 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
             <ReactFlow
               nodes={nodes}
               edges={edges}
-              onNodesChange={isLocked || showPreview ? undefined : onNodesChange}
+               onNodesChange={isLocked || showPreview ? undefined : onNodesChange}
               onEdgesChange={isLocked || showPreview ? undefined : onEdgesChange}
               onConnect={isLocked || showPreview ? undefined : onConnect}
               onNodeClick={onNodeClick}
+              onEdgeClick={onEdgeClick}
               onPaneClick={onPaneClick}
               onDrop={onDrop}
               onDragOver={onDragOver}
@@ -508,7 +577,7 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
           </div>
 
           {/* Toggle Right */}
-          {!showPreview && selectedNode && (
+          {!showPreview && (selectedNode || selectedEdge) && (
             <button
               onClick={() => setShowRightPanel((v) => !v)}
               className="absolute top-3 z-30 w-8 h-8 rounded-lg bg-white border border-gray-200 shadow-sm flex items-center justify-center hover:bg-gray-50 transition-all"
@@ -527,20 +596,33 @@ function CanvasInner({ workflow, onBack }: WorkflowCanvasProps) {
             <div
               className="shrink-0 overflow-hidden transition-all duration-300"
               style={{
-                width: showRightPanel && selectedNode ? 304 : 0,
+                width: showRightPanel && (selectedNode || selectedEdge) ? 304 : 0,
                 borderLeft: '1px solid #e5e7eb',
               }}
             >
               <div className="w-[304px] h-full">
-                <PropertiesPanel
-                  node={selectedNode}
-                  onUpdate={handleNodeUpdate}
-                  onClose={() => {
-                    setShowRightPanel(false);
-                    setSelectedNode(null);
-                  }}
-                  onDelete={handleDeleteSelected}
-                />
+                {selectedNode ? (
+                  <PropertiesPanel
+                    node={selectedNode}
+                    onUpdate={handleNodeUpdate}
+                    onClose={() => {
+                      setShowRightPanel(false);
+                      setSelectedNode(null);
+                    }}
+                    onDelete={handleDeleteSelected}
+                  />
+                ) : selectedEdge ? (
+                   <ActionPropertiesPanel
+                    id={selectedEdge.id}
+                    data={selectedEdge.data!}
+                    onUpdate={handleEdgeUpdate}
+                    onClose={() => {
+                      setShowRightPanel(false);
+                      setSelectedEdge(null);
+                    }}
+                    onDelete={handleDeleteSelected}
+                   />
+                ) : null}
               </div>
             </div>
           )}

@@ -14,6 +14,8 @@ export interface RoleNodeData {
   /** Combined "Role Name — Council" label, e.g. "Deputy Secretary — NCAHP" */
   label: string;
   stage: StageId;
+  /** Placeholder 2-digit role ID */
+  roleId?: string;
   [key: string]: unknown;
 }
 
@@ -24,6 +26,10 @@ export interface SwimlaneNodeData {
 
 export interface ActionEdgeData {
   action: ActionType;
+  /** Custom action label if any (CRUD) */
+  actionLabel?: string;
+  /** Placeholder 2-digit action ID */
+  actionId?: string;
   [key: string]: unknown;
 }
 
